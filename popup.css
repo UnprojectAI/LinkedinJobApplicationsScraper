@@ -246,10 +246,10 @@ button:disabled {
   margin-bottom: 4px;
 }
 
-#stop-scraping {
+#stop-downloading {
   background-color: #e74c3c;
 }
 
-#stop-scraping:hover {
+#stop-downloading:hover {
   background-color: #c0392b;
 } 

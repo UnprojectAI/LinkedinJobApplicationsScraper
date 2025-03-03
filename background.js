@@ -1,4 +1,4 @@
-// Global variables to track scraping state
+// Global variables to track downloading state
 let isScrapingRunning = false;
 let currentJobUrl = '';
 let totalProfilesVisited = 0;
@@ -61,7 +61,7 @@ function loadState() {
 
 // Initialize state on startup
 loadState().then(() => {
-  // Check if we need to resume a scraping operation
+  // Check if we need to resume a downloading operation
   if (isScrapingRunning && currentJobUrl) {
     // Verify if the main tab still exists
     if (mainTabId) {
@@ -74,7 +74,7 @@ loadState().then(() => {
         } else {
           // Resume from where we left off
           setTimeout(() => {
-            updateStatus('Resuming scraping operation...', true);
+            updateStatus('Resuming downloading operation...', true);
             continueScrapingFromCurrentState();
           }, 1000);
         }
@@ -87,7 +87,7 @@ loadState().then(() => {
   }
 });
 
-// Function to check if we should continue scraping
+// Function to check if we should continue downloading
 function shouldContinueScraping() {
   return isScrapingRunning && !stopRequested;
 }
@@ -438,12 +438,12 @@ function clearAllTimeouts() {
   }
 }
 
-// Function to continue scraping from current state
+// Function to continue downloading from current state
 async function continueScrapingFromCurrentState() {
   try {
     // Check if we should stop before starting
     if (!shouldContinueScraping()) {
-      updateStatus('Scraping stopped.', false);
+      updateStatus('Downloading stopped.', false);
       return;
     }
     
@@ -486,7 +486,7 @@ async function continueScrapingFromCurrentState() {
       
       // Check if we should stop after page load
       if (!shouldContinueScraping()) {
-        updateStatus('Scraping stopped.', false);
+        updateStatus('Downloading stopped.', false);
         return;
       }
     }
@@ -502,7 +502,7 @@ async function continueScrapingFromCurrentState() {
       
       // Check if we should stop after navigation
       if (!shouldContinueScraping()) {
-        updateStatus('Scraping stopped.', false);
+        updateStatus('Downloading stopped.', false);
         return;
       }
       
@@ -516,7 +516,7 @@ async function continueScrapingFromCurrentState() {
       
       // Check if we should stop after page load
       if (!shouldContinueScraping()) {
-        updateStatus('Scraping stopped.', false);
+        updateStatus('Downloading stopped.', false);
         return;
       }
       
@@ -527,7 +527,7 @@ async function continueScrapingFromCurrentState() {
       
       // Check if we should stop after first pass
       if (!shouldContinueScraping()) {
-        updateStatus('Scraping stopped.', false);
+        updateStatus('Downloading stopped.', false);
         return;
       }
       
@@ -536,7 +536,7 @@ async function continueScrapingFromCurrentState() {
       
       // Check if we should stop after second pass
       if (!shouldContinueScraping()) {
-        updateStatus('Scraping stopped.', false);
+        updateStatus('Downloading stopped.', false);
         return;
       }
       
@@ -547,7 +547,7 @@ async function continueScrapingFromCurrentState() {
         currentPageNumber++;
         saveState();
       } else {
-        updateStatus('No more profiles found. Scraping complete.', false);
+        updateStatus('No more profiles found. Downloading complete.', false);
         isScrapingRunning = false;
         saveState();
         break;
@@ -564,10 +564,10 @@ async function continueScrapingFromCurrentState() {
   }
 }
 
-// Main scraping function
+// Main downloading function
 async function startScraping(jobUrl) {
   if (isScrapingRunning) {
-    updateStatus('Scraping already in progress.', true);
+    updateStatus('Downloading already in progress.', true);
     return;
   }
   
@@ -581,7 +581,7 @@ async function startScraping(jobUrl) {
   currentPageNumber = 1;
   mainTabId = null;
   
-  updateStatus('Starting LinkedIn scraper...');
+  updateStatus('Starting LinkedIn Downloader...');
   saveState();
   
   try {
@@ -608,7 +608,7 @@ async function startScraping(jobUrl) {
     
     // Check if we should stop after page load
     if (!shouldContinueScraping()) {
-      updateStatus('Scraping stopped.', false);
+      updateStatus('Downloading stopped.', false);
       return;
     }
     
@@ -625,7 +625,7 @@ async function startScraping(jobUrl) {
       
       // Check if we should stop after navigation
       if (!shouldContinueScraping()) {
-        updateStatus('Scraping stopped.', false);
+        updateStatus('Downloading stopped.', false);
         return;
       }
       
@@ -639,7 +639,7 @@ async function startScraping(jobUrl) {
       
       // Check if we should stop after page load
       if (!shouldContinueScraping()) {
-        updateStatus('Scraping stopped.', false);
+        updateStatus('Downloading stopped.', false);
         return;
       }
       
@@ -650,7 +650,7 @@ async function startScraping(jobUrl) {
       
       // Check if we should stop after first pass
       if (!shouldContinueScraping()) {
-        updateStatus('Scraping stopped.', false);
+        updateStatus('Downloading stopped.', false);
         return;
       }
       
@@ -659,7 +659,7 @@ async function startScraping(jobUrl) {
       
       // Check if we should stop after second pass
       if (!shouldContinueScraping()) {
-        updateStatus('Scraping stopped.', false);
+        updateStatus('Downloading stopped.', false);
         return;
       }
       
@@ -670,7 +670,7 @@ async function startScraping(jobUrl) {
         currentPageNumber++;
         saveState();
       } else {
-        updateStatus('No more profiles found. Scraping complete.', false);
+        updateStatus('No more profiles found. Downloading complete.', false);
         isScrapingRunning = false;
         saveState();
         break;
@@ -687,21 +687,21 @@ async function startScraping(jobUrl) {
   }
 }
 
-// Function to stop scraping
+// Function to stop downloading
 function stopScraping() {
-  console.log('Stop scraping requested');
+  console.log('Stop downloading requested');
   stopRequested = true;
   
   // Clear any active timeouts to stop waiting processes
   clearAllTimeouts();
   
-  updateStatus('Stopping scraping process...', true);
+  updateStatus('Stopping downloading process...', true);
   
   // We'll set isScrapingRunning to false after a short delay
   // to allow in-progress operations to see the stop requested flag
   setTimeout(() => {
     isScrapingRunning = false;
-    updateStatus('Scraping stopped by user.', false);
+    updateStatus('Downloading stopped by user.', false);
     saveState();
   }, 1000);
   
@@ -731,7 +731,7 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
     } else {
       chrome.runtime.sendMessage({
         type: 'status',
-        text: isScrapingRunning ? 'Scraping in progress...' : 'Ready to start scraping.',
+        text: isScrapingRunning ? 'Downloading in progress...' : 'Ready to start downloading.',
         isRunning: isScrapingRunning,
         currentPage: currentPageNumber,
         profilesVisited: totalProfilesVisited,

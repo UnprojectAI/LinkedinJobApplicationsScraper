@@ -1,6 +1,6 @@
 document.addEventListener('DOMContentLoaded', function() {
   const urlInput = document.getElementById('job-url');
-  const startButton = document.getElementById('start-scraping');
+  const startButton = document.getElementById('start-downloading');
   const statusText = document.getElementById('status-text');
   const progressContainer = document.getElementById('progress-container');
   const currentPage = document.getElementById('current-page');
@@ -64,7 +64,7 @@ document.addEventListener('DOMContentLoaded', function() {
     
     if (message.isRunning) {
       startButton.disabled = true;
-      startButton.textContent = 'Scraping...';
+      startButton.textContent = 'Downloading...';
       progressContainer.classList.remove('hidden');
       
       // Update progress information
@@ -93,10 +93,10 @@ document.addEventListener('DOMContentLoaded', function() {
       }
       
       // Add stop button if it doesn't exist
-      if (!document.getElementById('stop-scraping')) {
+      if (!document.getElementById('stop-downloading')) {
         const stopButton = document.createElement('button');
-        stopButton.id = 'stop-scraping';
-        stopButton.textContent = 'Stop Scraping';
+        stopButton.id = 'stop-downloading';
+        stopButton.textContent = 'Stop Downloading';
         stopButton.style.marginTop = '10px';
         stopButton.style.backgroundColor = '#e74c3c';
         
@@ -112,10 +112,10 @@ document.addEventListener('DOMContentLoaded', function() {
       }
     } else {
       startButton.disabled = false;
-      startButton.textContent = 'Start Scraping';
+      startButton.textContent = 'Start Downloading';
       
       // Remove stop button if exists
-      const stopButton = document.getElementById('stop-scraping');
+      const stopButton = document.getElementById('stop-downloading');
       if (stopButton) {
         stopButton.remove();
       }
@@ -128,7 +128,7 @@ document.addEventListener('DOMContentLoaded', function() {
       urlInput.value = result.linkedinJobUrl;
     }
     
-    // Check if there's an active scraping operation
+    // Check if there's an active downloading operation
     if (result.scrapingState && result.scrapingState.isRunning) {
       isScrapingInProgress = true;
       
@@ -137,7 +137,7 @@ document.addEventListener('DOMContentLoaded', function() {
     }
   });
   
-  // Listen for scraping status updates from background script
+  // Listen for downloading status updates from background script
   chrome.runtime.onMessage.addListener(function(message) {
     if (message.type === 'status') {
       updateUI(message);
@@ -167,10 +167,10 @@ document.addEventListener('DOMContentLoaded', function() {
     // Update UI
     startButton.disabled = true;
     startButton.textContent = 'Starting...';
-    statusText.textContent = 'Initializing scraper...';
+    statusText.textContent = 'Initializing Downloader...';
     progressContainer.classList.remove('hidden');
     
-    // Send message to background script to start scraping
+    // Send message to background script to start downloading
     chrome.runtime.sendMessage({
       action: 'startScraping',
       jobUrl: jobUrl

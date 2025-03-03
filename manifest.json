@@ -1,6 +1,6 @@
 {
   "manifest_version": 3,
-  "name": "LinkedIn Job Applications Scraper",
+  "name": "HumanBit LinkedIn Applications Downloader",
   "version": "1.0",
   "description": "Download resumes from LinkedIn job applications",
   "permissions": [
