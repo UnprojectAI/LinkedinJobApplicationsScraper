@@ -1,0 +1,126 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Create LinkedIn Scraper Extension Icons</title>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      padding: 20px;
+      max-width: 800px;
+      margin: 0 auto;
+    }
+    
+    .icon-container {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      margin: 20px 0;
+    }
+    
+    canvas {
+      border: 1px solid #ccc;
+      margin: 10px;
+    }
+    
+    .instructions {
+      background-color: #f5f5f5;
+      padding: 15px;
+      border-radius: 5px;
+      margin-bottom: 20px;
+    }
+    
+    .download-links {
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+    }
+    
+    .download-links a {
+      padding: 10px;
+      background-color: #0077b5;
+      color: white;
+      text-decoration: none;
+      border-radius: 5px;
+      text-align: center;
+    }
+  </style>
+</head>
+<body>
+  <h1>LinkedIn Scraper Extension Icon Generator</h1>
+  
+  <div class="instructions">
+    <h2>Instructions:</h2>
+    <ol>
+      <li>The icons will be drawn on the canvases below.</li>
+      <li>Click each download link to save the icon.</li>
+      <li>Save each icon to the <code>images</code> folder with the corresponding name.</li>
+    </ol>
+  </div>
+  
+  <div class="icon-container">
+    <canvas id="icon16" width="16" height="16"></canvas>
+    <canvas id="icon48" width="48" height="48"></canvas>
+    <canvas id="icon128" width="128" height="128"></canvas>
+    
+    <div class="download-links">
+      <a id="download16" href="#" download="icon16.png">Download 16x16 Icon</a>
+      <a id="download48" href="#" download="icon48.png">Download 48x48 Icon</a>
+      <a id="download128" href="#" download="icon128.png">Download 128x128 Icon</a>
+    </div>
+  </div>
+  
+  <script>
+    // Function to draw the LinkedIn icon on a canvas
+    function drawIcon(canvas) {
+      const ctx = canvas.getContext('2d');
+      const width = canvas.width;
+      const height = canvas.height;
+      const radius = width * 0.15; // Border radius
+      
+      // Draw rounded rectangle background
+      ctx.fillStyle = '#0077b5'; // LinkedIn blue
+      ctx.beginPath();
+      ctx.moveTo(radius, 0);
+      ctx.lineTo(width - radius, 0);
+      ctx.quadraticCurveTo(width, 0, width, radius);
+      ctx.lineTo(width, height - radius);
+      ctx.quadraticCurveTo(width, height, width - radius, height);
+      ctx.lineTo(radius, height);
+      ctx.quadraticCurveTo(0, height, 0, height - radius);
+      ctx.lineTo(0, radius);
+      ctx.quadraticCurveTo(0, 0, radius, 0);
+      ctx.closePath();
+      ctx.fill();
+      
+      // Draw 'L' letter
+      ctx.fillStyle = 'white';
+      ctx.font = `bold ${width * 0.7}px Arial`;
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      ctx.fillText('L', width / 2, height / 2 + height * 0.05);
+    }
+    
+    // Function to setup a canvas and its download link
+    function setupCanvas(canvasId, downloadId) {
+      const canvas = document.getElementById(canvasId);
+      const downloadLink = document.getElementById(downloadId);
+      
+      // Draw the icon
+      drawIcon(canvas);
+      
+      // Setup download link
+      downloadLink.addEventListener('click', function() {
+        const dataUrl = canvas.toDataURL('image/png');
+        downloadLink.href = dataUrl;
+      });
+    }
+    
+    // Setup all canvases and download links
+    window.onload = function() {
+      setupCanvas('icon16', 'download16');
+      setupCanvas('icon48', 'download48');
+      setupCanvas('icon128', 'download128');
+    };
+  </script>
+</body>
+</html> 

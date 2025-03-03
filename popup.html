@@ -1,0 +1,70 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>LinkedIn Job Applications Scraper</title>
+  <link rel="stylesheet" href="popup.css">
+</head>
+<body>
+  <div class="container">
+    <h1>LinkedIn Job Applications Scraper</h1>
+    
+    <div class="form-group">
+      <label for="job-url">LinkedIn Job Applications URL:</label>
+      <input type="text" id="job-url" placeholder="https://www.linkedin.com/hiring/jobs/...">
+    </div>
+    
+    <div class="form-group">
+      <button id="start-scraping">Start Scraping</button>
+    </div>
+    
+    <div id="status" class="status-container">
+      <div id="status-text"></div>
+      <div id="progress-container" class="hidden">
+        <div class="progress-info">
+          <span id="current-page">Page: 0</span>
+        </div>
+        
+        <div class="stats-container">
+          <div class="stat-item">
+            <span class="stat-label">Visited:</span>
+            <span id="profiles-visited">0</span>
+          </div>
+          <div class="stat-item">
+            <span class="stat-label">Downloaded:</span>
+            <span id="profiles-downloaded">0</span>
+          </div>
+          <div class="stat-item">
+            <span class="stat-label">Failed:</span>
+            <span id="profiles-failed" class="hoverable">0</span>
+            <div id="failed-list" class="tooltip-content">
+              <div class="tooltip-header">
+                <span>Failed Downloads</span>
+                <button id="clear-failed" title="Clear failed list">×</button>
+              </div>
+              <div id="failed-profiles-list">
+                <p>No failed downloads yet.</p>
+              </div>
+            </div>
+          </div>
+        </div>
+        
+        <div class="progress-bar-container">
+          <div id="progress-bar"></div>
+        </div>
+      </div>
+    </div>
+    
+    <div class="notes">
+      <p><strong>Notes:</strong></p>
+      <ul>
+        <li>You can close this popup window - the scraping will continue in the background</li>
+        <li>If you reopen the extension, it will show the current progress</li>
+        <li>Downloads are saved to your default Chrome download folder</li>
+        <li><strong>Hover over "Failed" count</strong> to see profiles that failed to download</li>
+      </ul>
+    </div>
+  </div>
+  
+  <script src="popup.js"></script>
+</body>
+</html> 

@@ -1,0 +1,255 @@
+body {
+  font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+  margin: 0;
+  padding: 0;
+  background-color: #f5f5f5;
+}
+
+.container {
+  width: 400px;
+  padding: 20px;
+  box-sizing: border-box;
+}
+
+h1 {
+  font-size: 18px;
+  color: #0077b5;
+  margin-top: 0;
+  margin-bottom: 20px;
+  text-align: center;
+}
+
+.form-group {
+  margin-bottom: 15px;
+}
+
+label {
+  display: block;
+  margin-bottom: 5px;
+  font-weight: 600;
+  color: #333;
+}
+
+input[type="text"] {
+  width: 100%;
+  padding: 10px;
+  border: 1px solid #ddd;
+  border-radius: 4px;
+  box-sizing: border-box;
+  font-size: 14px;
+}
+
+button {
+  background-color: #0077b5;
+  color: white;
+  border: none;
+  padding: 10px 15px;
+  width: 100%;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 14px;
+  font-weight: 600;
+  transition: background-color 0.3s;
+}
+
+button:hover {
+  background-color: #005e93;
+}
+
+button:disabled {
+  background-color: #cccccc;
+  cursor: not-allowed;
+}
+
+.status-container {
+  margin-top: 15px;
+  background-color: #fff;
+  border: 1px solid #ddd;
+  border-radius: 4px;
+  padding: 10px;
+}
+
+#status-text {
+  color: #555;
+  font-size: 14px;
+  margin-bottom: 10px;
+}
+
+.progress-info {
+  display: flex;
+  justify-content: space-between;
+  margin-bottom: 5px;
+  font-size: 13px;
+  color: #666;
+}
+
+.stats-container {
+  display: flex;
+  justify-content: space-between;
+  margin-bottom: 10px;
+}
+
+.stat-item {
+  flex: 1;
+  text-align: center;
+  position: relative;
+  padding: 5px 0;
+  font-size: 13px;
+}
+
+.stat-label {
+  font-weight: 600;
+  margin-right: 4px;
+  color: #555;
+}
+
+#profiles-visited {
+  color: #00796b;
+}
+
+#profiles-downloaded {
+  color: #0077b5;
+}
+
+#profiles-failed {
+  color: #e74c3c;
+  cursor: pointer;
+}
+
+.hoverable {
+  position: relative;
+  text-decoration: underline;
+  text-decoration-style: dotted;
+}
+
+.tooltip-content {
+  display: none;
+  position: absolute;
+  top: 100%;
+  left: 50%;
+  transform: translateX(-50%);
+  background-color: white;
+  border: 1px solid #ddd;
+  border-radius: 4px;
+  padding: 0;
+  width: 250px;
+  max-height: 300px;
+  z-index: 10;
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+  margin-top: 5px;
+  text-align: left;
+  overflow: hidden;
+}
+
+.hoverable:hover .tooltip-content {
+  display: block;
+}
+
+.tooltip-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  background-color: #f5f5f5;
+  padding: 8px 10px;
+  border-bottom: 1px solid #ddd;
+  font-weight: 600;
+  color: #333;
+}
+
+.tooltip-header button {
+  width: auto;
+  background: none;
+  color: #777;
+  padding: 0 5px;
+  font-size: 18px;
+  font-weight: bold;
+  border-radius: 50%;
+}
+
+.tooltip-header button:hover {
+  background-color: #ddd;
+  color: #333;
+}
+
+#failed-profiles-list {
+  overflow-y: auto;
+  max-height: 250px;
+  padding: 10px;
+  font-size: 12px;
+}
+
+#failed-profiles-list a {
+  display: block;
+  color: #0077b5;
+  text-decoration: none;
+  padding: 5px 0;
+  border-bottom: 1px solid #f0f0f0;
+  line-height: 1.3;
+}
+
+#failed-profiles-list a:hover {
+  background-color: #f9f9f9;
+  text-decoration: underline;
+}
+
+#failed-profiles-list a .profile-name {
+  display: block;
+  font-weight: 600;
+  margin-bottom: 3px;
+}
+
+#failed-profiles-list a .profile-time {
+  display: block;
+  color: #777;
+  font-size: 10px;
+}
+
+.progress-bar-container {
+  width: 100%;
+  background-color: #e0e0e0;
+  border-radius: 4px;
+  height: 8px;
+  overflow: hidden;
+}
+
+#progress-bar {
+  height: 100%;
+  background-color: #0077b5;
+  width: 0%;
+  transition: width 0.3s ease-in-out;
+}
+
+.hidden {
+  display: none;
+}
+
+.notes {
+  margin-top: 15px;
+  font-size: 12px;
+  color: #666;
+  background-color: #f9f9f9;
+  border: 1px solid #ddd;
+  border-radius: 4px;
+  padding: 10px;
+}
+
+.notes p {
+  margin: 0 0 5px 0;
+}
+
+.notes ul {
+  margin: 0;
+  padding-left: 20px;
+}
+
+.notes li {
+  margin-bottom: 4px;
+}
+
+#stop-scraping {
+  background-color: #e74c3c;
+}
+
+#stop-scraping:hover {
+  background-color: #c0392b;
+} 
