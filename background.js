@@ -211,71 +211,150 @@ async function findAllProfilesOnPage(tabId) {
       return [];
     }
     
-    // Find all profile elements on the page using different selectors to ensure we get all profiles
-    const profileElementsResult = await safeTabOperation(
-      () => chrome.scripting.executeScript({
-        target: { tabId: tabId },
-        function: () => {
-          // Use multiple selectors to ensure we find all profiles
-          const selectors = [
-            '.hiring-applicants__list-item', // Original selector
-            '.artdeco-list__item', // Alternative selector
-            'li.artdeco-list__item[data-view-name="profile-entity-lockup"]' // Another possible selector
-          ];
-          
-          let allProfiles = [];
-          
-          // Try each selector
-          for (const selector of selectors) {
-            const elements = document.querySelectorAll(selector);
-            if (elements.length > 0) {
-              console.log(`Found ${elements.length} profiles with selector: ${selector}`);
-              
-              // Map elements to profile objects
-              const profiles = Array.from(elements).map(profile => {
-                const element = profile.querySelector('a');
-                // Try multiple selectors for name
-                const nameSelectors = [
-                  '.artdeco-entity-lockup__title',
-                  '.artdeco-entity-lockup__content .artdeco-entity-lockup__title',
-                  'h3'
-                ];
-                
-                let name = 'Unknown';
-                for (const nameSelector of nameSelectors) {
-                  const nameElement = profile.querySelector(nameSelector);
-                  if (nameElement) {
-                    name = nameElement.textContent.trim();
-                    break;
+    const EXPECTED_PROFILES = 25; // LinkedIn typically shows 25 profiles per page
+    const MAX_RETRIES = 3;
+    let retryCount = 0;
+    let profiles = [];
+    
+    while (retryCount < MAX_RETRIES && profiles.length < EXPECTED_PROFILES) {
+      if (retryCount > 0) {
+        console.log(`Retry #${retryCount}: Only found ${profiles.length} profiles, expecting ${EXPECTED_PROFILES}. Retrying...`);
+        
+        // Scroll down the page to ensure all content is loaded
+        await safeTabOperation(
+          () => chrome.scripting.executeScript({
+            target: { tabId: tabId },
+            function: () => {
+              return new Promise((resolve) => {
+                let totalHeight = 0;
+                const distance = 300;
+                const timer = setInterval(() => {
+                  window.scrollBy(0, distance);
+                  totalHeight += distance;
+                  
+                  if (totalHeight >= document.body.scrollHeight) {
+                    clearInterval(timer);
+                    // Scroll back to top
+                    window.scrollTo(0, 0);
+                    resolve();
                   }
-                }
+                }, 100);
+              });
+            }
+          }),
+          'Error scrolling the page'
+        );
+        
+        // Wait for a moment to let any lazy-loaded content appear
+        await new Promise(r => {
+          const timeout = setTimeout(r, 1500);
+          activeTimeouts.push(timeout);
+        });
+      }
+      
+      // Find all profile elements on the page using different selectors to ensure we get all profiles
+      const profileElementsResult = await safeTabOperation(
+        () => chrome.scripting.executeScript({
+          target: { tabId: tabId },
+          function: () => {
+            // Use multiple selectors to ensure we find all profiles
+            const selectors = [
+              '.hiring-applicants__list-item', // Original selector
+              '.artdeco-list__item', // Alternative selector
+              'li.artdeco-list__item[data-view-name="profile-entity-lockup"]', // Another possible selector
+              '.artdeco-list > li', // Broader selector
+              '.hiring-applicants__container .artdeco-list__item' // More specific selector
+            ];
+            
+            let allProfiles = [];
+            let bestProfileSet = [];
+            
+            // Try each selector
+            for (const selector of selectors) {
+              const elements = document.querySelectorAll(selector);
+              if (elements.length > 0) {
+                console.log(`Found ${elements.length} profiles with selector: ${selector}`);
                 
-                return element ? { url: element.href, name: name } : null;
-              }).filter(profile => profile !== null);
-              
-              allProfiles = profiles;
-              
-              // If we found a good number of profiles, return them
-              if (profiles.length > 0) {
-                console.log(`Using selector ${selector} with ${profiles.length} profiles`);
-                break;
+                // Map elements to profile objects
+                const profiles = Array.from(elements).map(profile => {
+                  let linkElement = null;
+                  
+                  // Try different approaches to find the profile link
+                  const linkSelectors = [
+                    'a[href*="/in/"]',
+                    'a[href*="/talent/profile/"]',
+                    '.artdeco-entity-lockup__title a',
+                    '.artdeco-entity-lockup__content a'
+                  ];
+                  
+                  for (const linkSelector of linkSelectors) {
+                    const foundLink = profile.querySelector(linkSelector);
+                    if (foundLink && foundLink.href) {
+                      linkElement = foundLink;
+                      break;
+                    }
+                  }
+                  
+                  if (!linkElement) return null;
+                  
+                  // Try multiple selectors for name
+                  const nameSelectors = [
+                    '.artdeco-entity-lockup__title',
+                    '.artdeco-entity-lockup__content .artdeco-entity-lockup__title',
+                    'h3',
+                    '.artdeco-entity-lockup__subtitle',
+                    '.artdeco-entity-lockup__title span'
+                  ];
+                  
+                  let name = 'Unknown';
+                  for (const nameSelector of nameSelectors) {
+                    const nameElement = profile.querySelector(nameSelector);
+                    if (nameElement) {
+                      name = nameElement.textContent.trim();
+                      break;
+                    }
+                  }
+                  
+                  return { url: linkElement.href, name: name };
+                }).filter(profile => profile !== null);
+                
+                if (profiles.length > bestProfileSet.length) {
+                  bestProfileSet = profiles;
+                  console.log(`New best selector: ${selector} with ${profiles.length} profiles`);
+                }
               }
             }
+            
+            // Use the selector that found the most profiles
+            allProfiles = bestProfileSet;
+            
+            // Remove duplicates (based on URL)
+            const uniqueProfiles = allProfiles.filter((profile, index, self) =>
+              index === self.findIndex((p) => p.url === profile.url)
+            );
+            
+            console.log(`Total unique profiles found: ${uniqueProfiles.length}`);
+            return uniqueProfiles;
           }
-          
-          console.log(`Total profiles found: ${allProfiles.length}`);
-          return allProfiles;
+        }),
+        'Error finding profile elements'
+      );
+      
+      if (profileElementsResult && profileElementsResult.length > 0 && profileElementsResult[0].result) {
+        profiles = profileElementsResult[0].result;
+        
+        // If we found a good number of profiles or it's our last retry, return them
+        if (profiles.length >= EXPECTED_PROFILES || retryCount === MAX_RETRIES - 1) {
+          console.log(`Found ${profiles.length} profiles out of expected ${EXPECTED_PROFILES}`);
+          return profiles;
         }
-      }),
-      'Error finding profile elements'
-    );
-    
-    if (!profileElementsResult || profileElementsResult.length === 0) {
-      console.warn('No profiles found or error retrieving profiles');
-      return [];
+      }
+      
+      retryCount++;
     }
     
-    return profileElementsResult[0].result || [];
+    console.log(`After ${retryCount} retries, found ${profiles.length} profiles out of expected ${EXPECTED_PROFILES}`);
+    return profiles;
     
   } catch (error) {
     console.error('Error in findAllProfilesOnPage:', error);
@@ -512,7 +591,59 @@ async function processPage(tabId) {
     updateStatus(`Processing page ${currentPageNumber} of ${paginationSettings.endPage}...`);
     
     // Find all profile links on the current page
-    const profiles = await findAllProfilesOnPage(tabId);
+    let profiles = await findAllProfilesOnPage(tabId);
+    
+    // If we found some profiles but less than expected, try reloading the page once
+    const EXPECTED_PROFILES = 25;
+    if (profiles && profiles.length > 0 && profiles.length < EXPECTED_PROFILES) {
+      console.log(`Found only ${profiles.length} profiles, expecting ${EXPECTED_PROFILES}. Trying to reload the page...`);
+      
+      // Reload the page
+      updateStatus(`Reloading page ${currentPageNumber} to find more profiles...`);
+      
+      // Calculate the start parameter for the current page
+      const currentPageStartParam = (currentPageNumber - 1) * 25;
+      
+      // Update URL with the current start parameter
+      let currentPageUrl = currentJobUrl;
+      const url = new URL(currentJobUrl);
+      
+      // Remove any existing start parameter
+      if (url.searchParams.has('start')) {
+        url.searchParams.delete('start');
+      }
+      
+      // Add the correct start parameter
+      url.searchParams.append('start', currentPageStartParam);
+      currentPageUrl = url.toString();
+      
+      // Navigate to the same page again
+      await safeTabOperation(
+        () => chrome.tabs.update(tabId, { url: currentPageUrl }),
+        'Error reloading page'
+      );
+      
+      // Wait for page to load
+      await new Promise(r => {
+        const timeout = setTimeout(r, 5000);
+        activeTimeouts.push(timeout);
+      });
+      
+      if (stopRequested) {
+        throw new Error("Scraping stopped by user");
+      }
+      
+      // Try finding profiles again
+      const newProfiles = await findAllProfilesOnPage(tabId);
+      
+      // Use the set with more profiles
+      if (newProfiles && newProfiles.length > profiles.length) {
+        console.log(`Reload successful! Found ${newProfiles.length} profiles after reload (was ${profiles.length}).`);
+        profiles = newProfiles;
+      } else {
+        console.log(`Reload did not find more profiles. Continuing with the ${profiles.length} profiles found initially.`);
+      }
+    }
     
     if (!profiles || profiles.length === 0) {
       updateStatus('No profiles found on this page.', isScrapingRunning);
