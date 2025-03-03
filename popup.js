@@ -128,7 +128,7 @@ document.addEventListener('DOMContentLoaded', function() {
       urlInput.value = result.linkedinJobUrl;
     }
     
-    // Check if there's an active downloading operation
+    // Check if there's an active scraping operation
     if (result.scrapingState && result.scrapingState.isRunning) {
       isScrapingInProgress = true;
       
@@ -137,7 +137,7 @@ document.addEventListener('DOMContentLoaded', function() {
     }
   });
   
-  // Listen for downloading status updates from background script
+  // Listen for scraping status updates from background script
   chrome.runtime.onMessage.addListener(function(message) {
     if (message.type === 'status') {
       updateUI(message);
@@ -167,10 +167,10 @@ document.addEventListener('DOMContentLoaded', function() {
     // Update UI
     startButton.disabled = true;
     startButton.textContent = 'Starting...';
-    statusText.textContent = 'Initializing Downloader...';
+    statusText.textContent = 'Initializing downloader...';
     progressContainer.classList.remove('hidden');
     
-    // Send message to background script to start downloading
+    // Send message to background script to start scraping
     chrome.runtime.sendMessage({
       action: 'startScraping',
       jobUrl: jobUrl

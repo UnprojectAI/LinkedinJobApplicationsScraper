@@ -1,4 +1,4 @@
-// Global variables to track downloading state
+// Global variables to track scraping state
 let isScrapingRunning = false;
 let currentJobUrl = '';
 let totalProfilesVisited = 0;
@@ -12,6 +12,7 @@ const MAX_RETRIES = 3;
 let mainTabId = null;
 let stopRequested = false; // Flag to indicate a stop has been requested
 let activeTimeouts = []; // Array to track all active timeouts
+let profileUrlsOnCurrentPage = []; // Store profile URLs found on the current page
 
 // Save state to storage for persistence
 function saveState() {
@@ -26,7 +27,8 @@ function saveState() {
       pageNumber: currentPageNumber,
       lastStatus: lastStatusUpdate,
       mainTabId: mainTabId,
-      stopRequested: stopRequested
+      stopRequested: stopRequested,
+      profileUrlsOnCurrentPage: profileUrlsOnCurrentPage
     }
   });
 }
@@ -46,6 +48,7 @@ function loadState() {
         lastStatusUpdate = result.scrapingState.lastStatus;
         mainTabId = result.scrapingState.mainTabId;
         stopRequested = result.scrapingState.stopRequested || false;
+        profileUrlsOnCurrentPage = result.scrapingState.profileUrlsOnCurrentPage || [];
         
         // If stop was requested before browser was closed
         if (stopRequested) {
@@ -61,7 +64,7 @@ function loadState() {
 
 // Initialize state on startup
 loadState().then(() => {
-  // Check if we need to resume a downloading operation
+  // Check if we need to resume a scraping operation
   if (isScrapingRunning && currentJobUrl) {
     // Verify if the main tab still exists
     if (mainTabId) {
@@ -74,7 +77,7 @@ loadState().then(() => {
         } else {
           // Resume from where we left off
           setTimeout(() => {
-            updateStatus('Resuming downloading operation...', true);
+            updateStatus('Resuming scraping operation...', true);
             continueScrapingFromCurrentState();
           }, 1000);
         }
@@ -87,7 +90,7 @@ loadState().then(() => {
   }
 });
 
-// Function to check if we should continue downloading
+// Function to check if we should continue scraping
 function shouldContinueScraping() {
   return isScrapingRunning && !stopRequested;
 }
@@ -200,53 +203,97 @@ async function safeTabOperation(operation, errorMessage) {
   });
 }
 
-// Function to download all profiles on a single page
-async function downloadAllProfilesForSinglePage(tabId, downloadResume = false, sleepTime = 2000) {
+// Function to get all profiles on the page
+async function findAllProfilesOnPage(tabId) {
+  try {
+    // Check if we should stop
+    if (!shouldContinueScraping()) {
+      return [];
+    }
+    
+    // Find all profile elements on the page using different selectors to ensure we get all profiles
+    const profileElementsResult = await safeTabOperation(
+      () => chrome.scripting.executeScript({
+        target: { tabId: tabId },
+        function: () => {
+          // Use multiple selectors to ensure we find all profiles
+          const selectors = [
+            '.hiring-applicants__list-item', // Original selector
+            '.artdeco-list__item', // Alternative selector
+            'li.artdeco-list__item[data-view-name="profile-entity-lockup"]' // Another possible selector
+          ];
+          
+          let allProfiles = [];
+          
+          // Try each selector
+          for (const selector of selectors) {
+            const elements = document.querySelectorAll(selector);
+            if (elements.length > 0) {
+              console.log(`Found ${elements.length} profiles with selector: ${selector}`);
+              
+              // Map elements to profile objects
+              const profiles = Array.from(elements).map(profile => {
+                const element = profile.querySelector('a');
+                // Try multiple selectors for name
+                const nameSelectors = [
+                  '.artdeco-entity-lockup__title',
+                  '.artdeco-entity-lockup__content .artdeco-entity-lockup__title',
+                  'h3'
+                ];
+                
+                let name = 'Unknown';
+                for (const nameSelector of nameSelectors) {
+                  const nameElement = profile.querySelector(nameSelector);
+                  if (nameElement) {
+                    name = nameElement.textContent.trim();
+                    break;
+                  }
+                }
+                
+                return element ? { url: element.href, name: name } : null;
+              }).filter(profile => profile !== null);
+              
+              allProfiles = profiles;
+              
+              // If we found a good number of profiles, return them
+              if (profiles.length > 0) {
+                console.log(`Using selector ${selector} with ${profiles.length} profiles`);
+                break;
+              }
+            }
+          }
+          
+          console.log(`Total profiles found: ${allProfiles.length}`);
+          return allProfiles;
+        }
+      }),
+      'Error finding profile elements'
+    );
+    
+    if (!profileElementsResult || profileElementsResult.length === 0) {
+      console.warn('No profiles found or error retrieving profiles');
+      return [];
+    }
+    
+    return profileElementsResult[0].result || [];
+    
+  } catch (error) {
+    console.error('Error in findAllProfilesOnPage:', error);
+    return [];
+  }
+}
+
+// Function to process profiles (either visiting or downloading)
+async function processProfiles(profiles, downloadResume = false, sleepTime = 2000) {
   return new Promise(async (resolve) => {
     try {
       // Check if we should stop
-      if (!shouldContinueScraping()) {
+      if (!shouldContinueScraping() || !profiles || profiles.length === 0) {
         resolve(0);
         return;
       }
       
-      // Find all profile elements on the page
-      const profileElementsResult = await safeTabOperation(
-        () => chrome.scripting.executeScript({
-          target: { tabId: tabId },
-          function: () => {
-            return Array.from(document.querySelectorAll('.hiring-applicants__list-item')).map(profile => {
-              const element = profile.querySelector('a');
-              const nameElement = profile.querySelector('.artdeco-entity-lockup__title');
-              const name = nameElement ? nameElement.textContent.trim() : 'Unknown';
-              return element ? { url: element.href, name: name } : null;
-            }).filter(profile => profile !== null);
-          }
-        }),
-        'Error finding profile elements'
-      );
-      
-      // Check if we should stop
-      if (!shouldContinueScraping()) {
-        resolve(0);
-        return;
-      }
-      
-      if (!profileElementsResult || profileElementsResult.length === 0) {
-        updateStatus('No profiles found on this page or error retrieving profiles.');
-        resolve(0);
-        return;
-      }
-      
-      const profiles = profileElementsResult[0].result;
-      
-      if (!profiles || !profiles.length) {
-        updateStatus('No profiles found on this page.');
-        resolve(0);
-        return;
-      }
-      
-      const actionText = downloadResume ? 'Downloading resumes' : 'First pass: opening profiles';
+      const actionText = downloadResume ? 'Downloading resumes' : 'Visiting profiles';
       updateStatus(`Found ${profiles.length} profiles on page ${currentPageNumber}. ${actionText}...`);
       
       let processedCount = 0;
@@ -311,15 +358,29 @@ async function downloadAllProfilesForSinglePage(tabId, downloadResume = false, s
                 target: { tabId: newTab.id },
                 function: () => {
                   try {
-                    const resumeElements = document.querySelectorAll('.hiring-resume-viewer__resume-wrapper--collapsed');
-                    if (resumeElements.length > 0) {
-                      const anchorTag = resumeElements[0].querySelector('a');
-                      if (anchorTag) {
-                        const pdfUrl = anchorTag.href;
-                        window.location.href = pdfUrl;
-                        return true;
+                    // Try multiple selectors for resume elements
+                    const resumeSelectors = [
+                      '.hiring-resume-viewer__resume-wrapper--collapsed',
+                      '[data-test-hiring-resume-viewer-wrapper]',
+                      '.resume-viewer-wrapper'
+                    ];
+                    
+                    for (const selector of resumeSelectors) {
+                      const resumeElements = document.querySelectorAll(selector);
+                      if (resumeElements.length > 0) {
+                        for (const resumeElement of resumeElements) {
+                          const anchorTag = resumeElement.querySelector('a');
+                          if (anchorTag && anchorTag.href) {
+                            const pdfUrl = anchorTag.href;
+                            window.location.href = pdfUrl;
+                            console.log('Found and downloading resume with URL:', pdfUrl);
+                            return true;
+                          }
+                        }
                       }
                     }
+                    
+                    console.warn('No resume elements found on the page');
                     return false;
                   } catch (error) {
                     console.error('Error downloading resume:', error);
@@ -421,7 +482,7 @@ async function downloadAllProfilesForSinglePage(tabId, downloadResume = false, s
       resolve(processedCount);
       
     } catch (error) {
-      console.error('Error in downloadAllProfilesForSinglePage:', error);
+      console.error('Error in processProfiles:', error);
       resolve(0);
     }
   });
@@ -438,12 +499,53 @@ function clearAllTimeouts() {
   }
 }
 
-// Function to continue downloading from current state
+// Function to process a single page (both visiting and downloading)
+async function processPage(tabId) {
+  try {
+    // Check if we should stop
+    if (!shouldContinueScraping()) {
+      return 0;
+    }
+    
+    // First, collect all profiles on the page
+    updateStatus(`Finding all profiles on page ${currentPageNumber}...`);
+    const profiles = await findAllProfilesOnPage(tabId);
+    
+    if (!profiles || profiles.length === 0) {
+      updateStatus('No profiles found on this page.');
+      return 0;
+    }
+    
+    // Store profiles for the current page
+    profileUrlsOnCurrentPage = profiles;
+    saveState();
+    
+    // First pass: visit all profiles
+    updateStatus(`Visiting ${profiles.length} profiles on page ${currentPageNumber}...`);
+    await processProfiles(profiles, false, 2000);
+    
+    // Check if we should stop after first pass
+    if (!shouldContinueScraping()) {
+      return 0;
+    }
+    
+    // Second pass: download resumes
+    updateStatus(`Downloading resumes for ${profiles.length} profiles on page ${currentPageNumber}...`);
+    const profilesProcessed = await processProfiles(profiles, true, 3000);
+    
+    return profilesProcessed;
+  } catch (error) {
+    console.error('Error in processPage:', error);
+    return 0;
+  }
+}
+
+// Function to continue scraping from current state
 async function continueScrapingFromCurrentState() {
   try {
     // Check if we should stop before starting
     if (!shouldContinueScraping()) {
-      updateStatus('Downloading stopped.', false);
+      updateStatus('Scraping stopped.', false);
       return;
     }
     
@@ -486,7 +588,7 @@ async function continueScrapingFromCurrentState() {
       
       // Check if we should stop after page load
       if (!shouldContinueScraping()) {
-        updateStatus('Downloading stopped.', false);
+        updateStatus('Scraping stopped.', false);
         return;
       }
     }
@@ -502,7 +604,7 @@ async function continueScrapingFromCurrentState() {
       
       // Check if we should stop after navigation
       if (!shouldContinueScraping()) {
-        updateStatus('Downloading stopped.', false);
+        updateStatus('Scraping stopped.', false);
         return;
       }
       
@@ -516,27 +618,18 @@ async function continueScrapingFromCurrentState() {
       
       // Check if we should stop after page load
       if (!shouldContinueScraping()) {
-        updateStatus('Downloading stopped.', false);
+        updateStatus('Scraping stopped.', false);
         return;
       }
       
       updateStatus(`Processing page ${currentPageNumber}...`);
       
-      // First pass: open all profiles
-      await downloadAllProfilesForSinglePage(mainTabId, false, 2000);
+      // Process the current page (both visiting and downloading)
+      const profilesOnPage = await processPage(mainTabId);
       
-      // Check if we should stop after first pass
+      // Check if we should stop after processing page
       if (!shouldContinueScraping()) {
-        updateStatus('Downloading stopped.', false);
-        return;
-      }
-      
-      // Second pass: download resumes
-      const profilesOnPage = await downloadAllProfilesForSinglePage(mainTabId, true, 3000);
-      
-      // Check if we should stop after second pass
-      if (!shouldContinueScraping()) {
-        updateStatus('Downloading stopped.', false);
+        updateStatus('Scraping stopped.', false);
         return;
       }
       
@@ -547,7 +640,7 @@ async function continueScrapingFromCurrentState() {
         currentPageNumber++;
         saveState();
       } else {
-        updateStatus('No more profiles found. Downloading complete.', false);
+        updateStatus('No more profiles found. Scraping complete.', false);
         isScrapingRunning = false;
         saveState();
         break;
@@ -564,10 +657,10 @@ async function continueScrapingFromCurrentState() {
   }
 }
 
-// Main downloading function
+// Main scraping function
 async function startScraping(jobUrl) {
   if (isScrapingRunning) {
-    updateStatus('Downloading already in progress.', true);
+    updateStatus('Scraping already in progress.', true);
     return;
   }
   
@@ -578,10 +671,11 @@ async function startScraping(jobUrl) {
   totalProfilesDownloaded = 0;
   totalProfilesFailed = 0;
   failedProfileUrls = [];
+  profileUrlsOnCurrentPage = [];
   currentPageNumber = 1;
   mainTabId = null;
   
-  updateStatus('Starting LinkedIn Downloader...');
+  updateStatus('Starting LinkedIn scraper...');
   saveState();
   
   try {
@@ -608,7 +702,7 @@ async function startScraping(jobUrl) {
     
     // Check if we should stop after page load
     if (!shouldContinueScraping()) {
-      updateStatus('Downloading stopped.', false);
+      updateStatus('Scraping stopped.', false);
       return;
     }
     
@@ -625,7 +719,7 @@ async function startScraping(jobUrl) {
       
       // Check if we should stop after navigation
       if (!shouldContinueScraping()) {
-        updateStatus('Downloading stopped.', false);
+        updateStatus('Scraping stopped.', false);
         return;
       }
       
@@ -639,27 +733,18 @@ async function startScraping(jobUrl) {
       
       // Check if we should stop after page load
       if (!shouldContinueScraping()) {
-        updateStatus('Downloading stopped.', false);
+        updateStatus('Scraping stopped.', false);
         return;
       }
       
       updateStatus(`Processing page ${currentPageNumber}...`);
       
-      // First pass: open all profiles
-      await downloadAllProfilesForSinglePage(mainTabId, false, 2000);
+      // Process the current page (both visiting and downloading)
+      const profilesOnPage = await processPage(mainTabId);
       
-      // Check if we should stop after first pass
+      // Check if we should stop after processing page
       if (!shouldContinueScraping()) {
-        updateStatus('Downloading stopped.', false);
-        return;
-      }
-      
-      // Second pass: download resumes
-      const profilesOnPage = await downloadAllProfilesForSinglePage(mainTabId, true, 3000);
-      
-      // Check if we should stop after second pass
-      if (!shouldContinueScraping()) {
-        updateStatus('Downloading stopped.', false);
+        updateStatus('Scraping stopped.', false);
         return;
       }
       
@@ -670,7 +755,7 @@ async function startScraping(jobUrl) {
         currentPageNumber++;
         saveState();
       } else {
-        updateStatus('No more profiles found. Downloading complete.', false);
+        updateStatus('No more profiles found. Scraping complete.', false);
         isScrapingRunning = false;
         saveState();
         break;
@@ -687,21 +772,21 @@ async function startScraping(jobUrl) {
   }
 }
 
-// Function to stop downloading
+// Function to stop scraping
 function stopScraping() {
-  console.log('Stop downloading requested');
+  console.log('Stop scraping requested');
   stopRequested = true;
   
   // Clear any active timeouts to stop waiting processes
   clearAllTimeouts();
   
-  updateStatus('Stopping downloading process...', true);
+  updateStatus('Stopping scraping process...', true);
   
   // We'll set isScrapingRunning to false after a short delay
   // to allow in-progress operations to see the stop requested flag
   setTimeout(() => {
     isScrapingRunning = false;
-    updateStatus('Downloading stopped by user.', false);
+    updateStatus('Scraping stopped by user.', false);
     saveState();
   }, 1000);
   
@@ -731,7 +816,7 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
     } else {
       chrome.runtime.sendMessage({
         type: 'status',
-        text: isScrapingRunning ? 'Downloading in progress...' : 'Ready to start downloading.',
+        text: isScrapingRunning ? 'Scraping in progress...' : 'Ready to start scraping.',
         isRunning: isScrapingRunning,
         currentPage: currentPageNumber,
         profilesVisited: totalProfilesVisited,
