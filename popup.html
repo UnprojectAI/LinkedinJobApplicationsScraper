@@ -13,6 +13,25 @@
       <input type="text" id="job-url" placeholder="https://www.linkedin.com/hiring/jobs/...">
     </div>
     
+    <!-- Advanced Settings Section -->
+    <div class="advanced-settings-container">
+      <div class="advanced-settings-header">
+        <span class="advanced-settings-icon" id="advanced-settings-toggle">Advanced Settings</span>
+      </div>
+      <div class="advanced-settings-content hidden" id="advanced-settings">
+        <div class="settings-row">
+          <div class="setting-item">
+            <label for="start-page">Start Page:</label>
+            <input type="number" id="start-page" min="1" value="1">
+          </div>
+          <div class="setting-item">
+            <label for="end-page">End Page:</label>
+            <input type="number" id="end-page" min="1" value="20">
+          </div>
+        </div>
+      </div>
+    </div>
+    
     <div class="form-group">
       <button id="start-downloading">Start Downloading</button>
     </div>
@@ -35,7 +54,7 @@
           </div>
           <div class="stat-item">
             <span class="stat-label">Failed:</span>
-            <span id="profiles-failed" class="hoverable">0</span>
+            <span id="profiles-failed">0</span>
             <div id="failed-list" class="tooltip-content">
               <div class="tooltip-header">
                 <span>Failed Downloads</span>
@@ -51,6 +70,9 @@
         <div class="progress-bar-container">
           <div id="progress-bar"></div>
         </div>
+        
+        <!-- Add Retry Failed Profiles button -->
+        <button id="retry-failed" class="secondary-button hidden">Retry Failed Profiles</button>
       </div>
     </div>
     

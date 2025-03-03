@@ -7,12 +7,19 @@ document.addEventListener('DOMContentLoaded', function() {
   const profilesVisited = document.getElementById('profiles-visited');
   const profilesDownloaded = document.getElementById('profiles-downloaded');
   const profilesFailed = document.getElementById('profiles-failed');
+  const failedList = document.getElementById('failed-list');
   const failedProfilesList = document.getElementById('failed-profiles-list');
   const clearFailedButton = document.getElementById('clear-failed');
   const progressBar = document.getElementById('progress-bar');
+  const retryFailedButton = document.getElementById('retry-failed');
+  const advancedSettingsToggle = document.getElementById('advanced-settings-toggle');
+  const advancedSettings = document.getElementById('advanced-settings');
+  const startPageInput = document.getElementById('start-page');
+  const endPageInput = document.getElementById('end-page');
   
   let isScrapingInProgress = false;
   let currentFailedProfiles = [];
+  let failedListActive = false;
   
   // Format a timestamp
   function formatTimestamp(timestamp) {
@@ -29,6 +36,7 @@ document.addEventListener('DOMContentLoaded', function() {
     
     if (!failedProfiles || failedProfiles.length === 0) {
       failedProfilesList.innerHTML = '<p>No failed downloads yet.</p>';
+      retryFailedButton.classList.add('hidden');
       return;
     }
     
@@ -44,7 +52,7 @@ document.addEventListener('DOMContentLoaded', function() {
       
       const nameSpan = document.createElement('span');
       nameSpan.className = 'profile-name';
-      nameSpan.textContent = profile.name;
+      nameSpan.textContent = profile.name || 'Unknown Profile';
       
       const timeSpan = document.createElement('span');
       timeSpan.className = 'profile-time';
@@ -54,7 +62,42 @@ document.addEventListener('DOMContentLoaded', function() {
       profileLink.appendChild(timeSpan);
       failedProfilesList.appendChild(profileLink);
     });
+
+    // Make sure the count shows the correct number
+    profilesFailed.textContent = failedProfiles.length;
+    
+    // Show the retry button if there are failed profiles and scraping is not in progress
+    if (failedProfiles.length > 0 && !isScrapingInProgress) {
+      retryFailedButton.classList.remove('hidden');
+    } else {
+      retryFailedButton.classList.add('hidden');
+    }
   }
+  
+  // Set up toggle functionality for failed list
+  profilesFailed.addEventListener('click', function(e) {
+    e.stopPropagation(); // Prevent event from bubbling up
+    failedListActive = !failedListActive;
+    
+    if (failedListActive) {
+      failedList.classList.add('active');
+    } else {
+      failedList.classList.remove('active');
+    }
+  });
+  
+  // Handle clicks outside the failed list to close it
+  document.addEventListener('click', function(e) {
+    if (failedListActive && !failedList.contains(e.target) && e.target !== profilesFailed) {
+      failedListActive = false;
+      failedList.classList.remove('active');
+    }
+  });
+  
+  // Prevent clicks inside the failed list from bubbling up
+  failedList.addEventListener('click', function(e) {
+    e.stopPropagation();
+  });
   
   // Function to update the UI based on status
   function updateUI(message) {
@@ -66,6 +109,8 @@ document.addEventListener('DOMContentLoaded', function() {
       startButton.disabled = true;
       startButton.textContent = 'Downloading...';
       progressContainer.classList.remove('hidden');
+      retryFailedButton.classList.add('hidden');
+      retryFailedButton.disabled = true;
       
       // Update progress information
       if (message.currentPage !== undefined) {
@@ -119,13 +164,71 @@ document.addEventListener('DOMContentLoaded', function() {
       if (stopButton) {
         stopButton.remove();
       }
+      
+      // Re-enable retry button if needed
+      retryFailedButton.disabled = false;
+      
+      // Show retry button if there are failed profiles
+      if (currentFailedProfiles && currentFailedProfiles.length > 0) {
+        retryFailedButton.classList.remove('hidden');
+        retryFailedButton.textContent = 'Retry Failed Profiles';
+      } else {
+        retryFailedButton.classList.add('hidden');
+      }
     }
   }
   
-  // Restore previously entered URL if any
-  chrome.storage.local.get(['linkedinJobUrl', 'scrapingState'], function(result) {
+  // Function to request latest failed profiles from background script
+  function refreshFailedProfiles() {
+    chrome.runtime.sendMessage({ action: 'getFailedProfiles' }, function(response) {
+      if (response && response.failedProfiles) {
+        updateFailedProfilesList(response.failedProfiles);
+      }
+    });
+  }
+  
+  // Set up toggle functionality for advanced settings
+  advancedSettingsToggle.addEventListener('click', function() {
+    advancedSettings.classList.toggle('hidden');
+    
+    // Save advanced settings state
+    const isAdvancedSettingsVisible = !advancedSettings.classList.contains('hidden');
+    chrome.storage.local.set({
+      advancedSettingsVisible: isAdvancedSettingsVisible
+    });
+  });
+  
+  // Save pagination input values when they change
+  startPageInput.addEventListener('change', function() {
+    const value = parseInt(this.value) || 1;
+    if (value < 1) this.value = 1;
+    chrome.storage.local.set({ startPage: parseInt(this.value) });
+  });
+  
+  endPageInput.addEventListener('change', function() {
+    const value = parseInt(this.value) || 20;
+    if (value < 1) this.value = 1;
+    chrome.storage.local.set({ endPage: parseInt(this.value) });
+  });
+
+  // Restore previously entered settings
+  chrome.storage.local.get(['linkedinJobUrl', 'scrapingState', 'startPage', 'endPage', 'advancedSettingsVisible'], function(result) {
     if (result.linkedinJobUrl) {
       urlInput.value = result.linkedinJobUrl;
+    }
+    
+    // Restore pagination settings if available
+    if (result.startPage) {
+      startPageInput.value = result.startPage;
+    }
+    
+    if (result.endPage) {
+      endPageInput.value = result.endPage;
+    }
+    
+    // Restore advanced settings visibility
+    if (result.advancedSettingsVisible) {
+      advancedSettings.classList.remove('hidden');
     }
     
     // Check if there's an active scraping operation
@@ -134,6 +237,11 @@ document.addEventListener('DOMContentLoaded', function() {
       
       // Request current status from background script
       chrome.runtime.sendMessage({ action: 'getStatus' });
+    }
+    
+    // Also check if there are any failed profiles to display
+    if (result.scrapingState && result.scrapingState.failedProfiles) {
+      updateFailedProfilesList(result.scrapingState.failedProfiles);
     }
   });
   
@@ -146,6 +254,9 @@ document.addEventListener('DOMContentLoaded', function() {
   
   // When popup opens, request current status from background script
   chrome.runtime.sendMessage({ action: 'getStatus' });
+  
+  // Request failed profiles specifically
+  refreshFailedProfiles();
   
   // Start button click handler
   startButton.addEventListener('click', function() {
@@ -161,19 +272,68 @@ document.addEventListener('DOMContentLoaded', function() {
       return;
     }
     
-    // Save URL for future use
-    chrome.storage.local.set({ linkedinJobUrl: jobUrl });
+    // Get pagination settings
+    const startPage = parseInt(startPageInput.value) || 1;
+    const endPage = parseInt(endPageInput.value) || 20;
+    
+    // Validate pagination settings
+    if (startPage < 1) {
+      statusText.textContent = 'Start page must be at least 1';
+      return;
+    }
+    
+    if (endPage < startPage) {
+      statusText.textContent = 'End page must be greater than or equal to start page';
+      return;
+    }
+    
+    // Save settings for future use
+    chrome.storage.local.set({
+      linkedinJobUrl: jobUrl,
+      startPage: startPage,
+      endPage: endPage
+    });
     
     // Update UI
     startButton.disabled = true;
     startButton.textContent = 'Starting...';
     statusText.textContent = 'Initializing downloader...';
     progressContainer.classList.remove('hidden');
+    retryFailedButton.classList.add('hidden');
     
     // Send message to background script to start scraping
     chrome.runtime.sendMessage({
       action: 'startScraping',
-      jobUrl: jobUrl
+      jobUrl: jobUrl,
+      startPage: startPage,
+      endPage: endPage
+    });
+  });
+  
+  // Retry Failed Profiles button click handler
+  retryFailedButton.addEventListener('click', function() {
+    if (currentFailedProfiles.length === 0) {
+      statusText.textContent = 'No failed profiles to retry';
+      return;
+    }
+    
+    // Update UI
+    retryFailedButton.disabled = true;
+    retryFailedButton.textContent = 'Retrying...';
+    statusText.textContent = 'Retrying failed profiles...';
+    
+    // Send message to background script to retry failed profiles
+    chrome.runtime.sendMessage({
+      action: 'retryFailedProfiles'
+    }, function(response) {
+      if (response && response.success) {
+        console.log('Started retrying failed profiles');
+      } else {
+        // If there was an error starting the retry process
+        retryFailedButton.disabled = false;
+        retryFailedButton.textContent = 'Retry Failed Profiles';
+        statusText.textContent = 'Failed to start retry process';
+      }
     });
   });
   
@@ -190,4 +350,7 @@ document.addEventListener('DOMContentLoaded', function() {
       }
     });
   });
+  
+  // Set up an interval to refresh failed profiles list periodically
+  setInterval(refreshFailedProfiles, 5000);
 }); 

@@ -21,6 +21,7 @@ This Chrome extension automates the process of downloading resumes from LinkedIn
    - Then revisit each profile to download the resume
    - Automatically save resumes to your default Chrome download location
 5. Progress information will be displayed in the popup.
+6. After downloading is complete, you can use the "Retry Failed Profiles" button to attempt downloading resumes that failed during the initial process.
 
 ## Key Features
 
@@ -29,6 +30,7 @@ This Chrome extension automates the process of downloading resumes from LinkedIn
 - **Error Handling**: The extension automatically retries operations when tab errors occur
 - **Automatic Resume**: If your browser closes, the extension will resume from where it left off
 - **Stop Capability**: You can stop the downloading process at any time
+- **Retry Failed Profiles**: After downloading completes, you can retry profiles that failed
 - **Detailed Tracking**: Separate counts for visited, downloaded, and failed profiles
 - **Failed Profiles List**: Hover over the "Failed" count to see profiles where download failed
 - **Quick Access**: Click on any failed profile to open it directly in a new tab
